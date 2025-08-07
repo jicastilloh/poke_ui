@@ -1,5 +1,27 @@
 import settings from "@/lib/settings";
 
+export async function deleteReport(reportId) {
+    try {
+      const response = await fetch(`${settings.URL}/api/request/${reportId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        }
+      })
+
+      if (!response.status == 204) {
+        throw new Error(`Error: ${response.status} - ${response.statusText}`)
+      }
+
+      return {
+        message: 'Eliminado correctamente'
+      }
+    } catch (error) {
+      console.error("Error fetching reports:", error)
+      throw error
+    }
+  }
+
 export async function getReports() {
     try {
       const response = await fetch(`${settings.URL}/api/request`)
@@ -18,7 +40,7 @@ export async function getReports() {
     }
   }
 
-  export async function createReport(pokemonType) {
+  export async function createReport(pokemonType, sample_size) {
     try {
       const response = await fetch(`${settings.URL}/api/request`, {
         method: "POST",
@@ -27,6 +49,7 @@ export async function getReports() {
         },
         body: JSON.stringify({
           pokemon_type: pokemonType,
+          sample_size: sample_size
         }),
       })
 

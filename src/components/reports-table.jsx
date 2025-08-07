@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Download, RefreshCw, ArrowUpDown } from "lucide-react"
+import { Download, RefreshCw, ArrowUpDown, Trash, X, Trash2, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Modal } from "@/components/ui/modal"
 
-export default function ReportsTable({ reports, loading, onRefresh, onDownload }) {
+export default function ReportsTable({ reports, loading, pokemonTypeSetter, sampleSizeSetter, onRefresh, onDownload, onDelete }) {
+  const [showModal, setShowModal] = useState(false)
+  const [selectedReportId, setSelectedReportId] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [sortedReports, setSortedReports] = useState([])
   const [sortDirection, setSortDirection] = useState("desc") // "desc" para descendente (más reciente primero)
@@ -90,6 +93,37 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
     onDownload(url)
   }
 
+  // Manejar la eliminación del reporte
+  const deleteReport = (ReportId) => {
+    onDelete(ReportId)
+    closeModal()
+  }
+
+  // Abrir el modal de confirmación para eliminar
+  const openConfirmModal = (ReportId) => {
+    setSelectedReportId(ReportId)
+    setShowModal(true)
+  }
+
+  // Cerrar el modal
+  const closeModal = () => {
+    setShowModal(false)
+    setSelectedReportId(null)
+  }
+
+  // Manejar limpiar inputs
+  const handleClear = async () => {
+    try {
+      pokemonTypeSetter("")
+      sampleSizeSetter(null)
+      toast.success("Se limpiaron los campos")
+    } catch (error) {
+      toast.error("No se pudieron limpiar los campos. Por favor, intenta de nuevo.")
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   // Manejar el refresco de la tabla
   const handleRefresh = async () => {
     try {
@@ -104,9 +138,37 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
   }
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-medium">Reports</h3>
+    <>
+      {showModal && (
+        <Modal>
+          <div className="text-center">
+            <h3 className="text-2xl font-bold text-gray-900">¿Eliminar reporte?</h3>
+            <div className="mt-2 px-7 py-3">
+              <p className="text-lg text-gray-500">¿Estás seguro que deseas eliminar el reporte <span className="font-bold">{selectedReportId}</span>?</p>
+            </div>
+            <div className="flex justify-center mt-4 gap-2">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  deleteReport(selectedReportId);
+                  toast.success('Reporte eliminado');
+                }}
+                className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      <div className="overflow-x-auto">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-medium">Reports</h3>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -120,7 +182,7 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
             }
           >
             <ArrowUpDown className="h-4 w-4" />
-            <span>{sortDirection === "desc" ? "Más reciente primero" : "Más antiguo primero"}</span>
+            <span>{sortDirection === "desc" ? "Más antiguo primero" : "Más reciente primero"}</span>
           </Button>
           <Button
             variant="outline"
@@ -132,6 +194,17 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClear}
+            disabled={loading}
+            className="flex items-center gap-1"
+          >
+            <X className="h-4 w-4" />
+            <span>Clear</span>
+          </Button>
+        </div>
         </div>
       </div>
 
@@ -149,11 +222,12 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
               <TableHead className="w-[100px]">ReportId</TableHead>
               <TableHead className="w-[120px]">Status</TableHead>
               <TableHead className="w-[150px]">PokemonType</TableHead>
+              <TableHead className="w-[150px]">Sample Size</TableHead>
               <TableHead className="w-[200px]">Created</TableHead>
               <TableHead className="w-[200px]">
                 <div className="flex items-center">Updated</div>
               </TableHead>
-              <TableHead className="w-[80px]">Action</TableHead>
+              <TableHead className="w-[80px] text-center">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -173,12 +247,20 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
                   <TableCell>
                     <span className="capitalize">{getPropertyValue(report, "pokemonType")}</span>
                   </TableCell>
+                  <TableCell>
+                    <span className="capitalize">{getPropertyValue(report, "sample_size") ?? 'Sin Especificar'}</span>
+                  </TableCell>
                   <TableCell>{getPropertyValue(report, "created")}</TableCell>
                   <TableCell>{getPropertyValue(report, "updated")}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     {isStatusCompleted(report) && (
                       <Button variant="ghost" size="icon" onClick={() => handleDownload(report)} title="Download CSV">
                         <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isStatusCompleted(report) && (
+                      <Button variant="ghost" size="icon" onClick={() => openConfirmModal(report.ReportId)} title="Delete Report">
+                        <Trash className="h-4 w-4 text-red-800" />
                       </Button>
                     )}
                   </TableCell>
@@ -194,6 +276,6 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
           </TableBody>
         </Table>
       )}
-    </div>
+    </>
   )
 }

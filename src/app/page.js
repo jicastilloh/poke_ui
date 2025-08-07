@@ -8,9 +8,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from 'lucide-react'
 
 import PokemonTypeSelector from "@/components/pokemon-type-selector"
+import SampleSize from "@/components/sample-size"
 import ReportsTable from "@/components/reports-table"
 import { getPokemonTypes } from "@/services/pokemon-service"
-import { getReports, createReport } from "@/services/report-service"
+import { getReports, createReport, deleteReport } from "@/services/report-service"
 
 export default function PokemonReportsPage() {
   const [pokemonTypes, setPokemonTypes] = useState([])
@@ -18,8 +19,10 @@ export default function PokemonReportsPage() {
   const [loadingTypes, setLoadingTypes] = useState(true)
   const [loadingReports, setLoadingReports] = useState(true)
   const [creatingReport, setCreatingReport] = useState(false)
+  const [deletingReport, setDeletingReport] = useState(false)
   const [error, setError] = useState(null)
   const [selectedType, setSelectedType] = useState("")
+  const [selectedSample, setSelectedSample] = useState(null)
 
   // Cargar los tipos de Pokémon
   useEffect(() => {
@@ -57,6 +60,22 @@ export default function PokemonReportsPage() {
     }
   }
 
+  // Función para eliminar los reportes
+  const handleDeleteReport = async (reportId) => {
+    try {
+      setDeletingReport(true)
+      const response = await deleteReport(reportId)
+      setDeletingReport(false)
+      await loadReports()
+      return response
+    } catch (error) {
+      console.error("Error deleting report:", error)
+      setError("Error al eliminat el reporte. Por favor, intenta de nuevo más tarde.")
+      setLoadingReports(false)
+      throw error
+    }
+  }
+
   // Función para refrescar la tabla
   const handleRefreshTable = async () => {
     try {
@@ -80,7 +99,7 @@ export default function PokemonReportsPage() {
       setCreatingReport(true)
 
       // Crear un nuevo reporte usando la API
-      await createReport(selectedType)
+      await createReport(selectedType, selectedSample)
 
       // Mostrar notificación de éxito
       toast.success(`Se ha generado un nuevo reporte para el tipo ${selectedType}.`)
@@ -104,7 +123,8 @@ export default function PokemonReportsPage() {
     window.open(url, "_blank")
   }
 
-  const isLoading = loadingTypes || loadingReports
+  const isLoading = loadingTypes || loadingReports || deletingReport
+  const isLoadingTable = loadingReports || deletingReport
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -121,8 +141,8 @@ export default function PokemonReportsPage() {
             </Alert>
           )}
 
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="w-full md:w-2/3">
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="w-full h-full col-span-1">
               <PokemonTypeSelector
                 pokemonTypes={pokemonTypes}
                 selectedType={selectedType}
@@ -130,10 +150,17 @@ export default function PokemonReportsPage() {
                 loading={loadingTypes}
               />
             </div>
-            <div className="w-full md:w-1/3">
+            <div className="w-full h-full col-span-1">
+              <SampleSize
+                selectedSample={selectedSample}
+                onSampleChange={setSelectedSample}
+                loading={isLoading}
+              />
+            </div>
+            <div className="w-full col-span-2">
               <Button
                 onClick={catchThemAll}
-                disabled={!selectedType || isLoading || creatingReport}
+                disabled={!selectedType || isLoading || creatingReport || (selectedSample && selectedSample < 1)}
                 className="w-full font-bold"
               >
                 {creatingReport ? "Creating..." : isLoading ? "Loading..." : "Catch them all!"}
@@ -143,9 +170,12 @@ export default function PokemonReportsPage() {
 
           <ReportsTable
             reports={reports}
-            loading={loadingReports}
+            loading={isLoadingTable}
+            pokemonTypeSetter={setSelectedType}
+            sampleSizeSetter={setSelectedSample}
             onRefresh={handleRefreshTable}
             onDownload={handleDownloadCSV}
+            onDelete={handleDeleteReport}
           />
         </CardContent>
       </Card>
